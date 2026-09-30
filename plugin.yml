@@ -1,0 +1,15 @@
+name: BDBlockDisplay
+main: BDBlockDisplay\BobyDev\main
+version: 1.0.0
+api: 5.1.3
+authors:
+- BobyDev
+depend:
+- Customies
+permissions:
+  bdbd.use:
+    default: op
+    description: Use BDBlockDisplay editor
+  bdbd.admin:
+    default: op
+    description: Manage BDBlockDisplay
