@@ -1,11 +1,11 @@
 name: BDBlockDisplay
 main: BDBlockDisplay\BobyDev\main
-version: 1.0.0
+version: 1.0.1
 api: 5.1.3
+description: In-world 3D block display editor
+
 authors:
 - BobyDev
-depend:
-- Customies
 permissions:
   bdbd.use:
     default: op

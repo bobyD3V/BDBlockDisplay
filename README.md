@@ -1,12 +1,13 @@
-<img width="1891" height="831" alt="1000073147" src="https://github.com/user-attachments/assets/6b3cd0f4-516c-47fb-8ad7-80a5b2b86bb2" />
-<img width="1891" height="832" alt="1000073148" src="https://github.com/user-attachments/assets/18f06f1e-7616-488d-8f37-8ea9b89c53eb" />
 # 🧊 BDBlockDisplay
+
+**Version:** 1.0.1
+**Author:** BobyDev
 
 > ✨ **A powerful in-world block display editor for Minecraft Bedrock servers running Altay.**
 
 BDBlockDisplay lets server administrators create **displayable 3D blocks**, then move, rotate, scale, group, and precisely position them directly inside the world.
 
-Built for **Altay + Customies** with a bundled resource pack and mobile-friendly controls.
+Built for **Altay** with bundled Customies editor support, a resource pack, and mobile-friendly controls.
 
 ---
 
@@ -34,7 +35,7 @@ Built for **Altay + Customies** with a bundled resource pack and mobile-friendly
 # 🚀 Requirements
 
 - **Altay 5.x**
-- **Customies**
+- No external plugin dependency; the required Customies editor support is bundled in the PHAR
 - A Bedrock client compatible with the server's resource-pack setup
 
 ### Compatibility target
@@ -47,19 +48,16 @@ BDBlockDisplay was developed and checked against the supplied **Altay 5.44.7** s
 
 # 📦 Installation
 
-### 1. Install dependencies
+### 1. Install the plugin
 
-Install:
-
-- Customies
-- BDBlockDisplay
+BDBlockDisplay is self-contained and does not require a separate Customies plugin. Install the BDBlockDisplay PHAR directly.
 
 ### 2. Place the plugin
 
 Put:
 
 ```text
-BDBlockDisplay-1.0.0.phar
+BDBlockDisplay-1.0.1.phar
 ```
 
 inside:
@@ -468,7 +466,7 @@ Check:
 
 Then verify that:
 
-- Customies is loaded.
+- the bundled Customies editor support is available.
 - BDBlockDisplay is loaded.
 - The client has accepted the required resource pack.
 
@@ -539,12 +537,12 @@ BDBlockDisplay/
 ╔══════════════════════════════════╗
 ║        🧊 BDBlockDisplay         ║
 ╠══════════════════════════════════╣
-║ Version : 1.0.0                  ║
+║ Version : 1.0.1                  ║
 ║ Author  : BobyDev                ║
 ║ Main    : BDBlockDisplay\        ║
 ║           BobyDev\main           ║
 ║ API     : Altay 5.x              ║
-║ Dependency : Customies           ║
+║ Dependency : None (bundled)           ║
 ╚══════════════════════════════════╝
 ```
 
@@ -581,7 +579,7 @@ Please include your:
 ```text
 Server software/version
 BDBlockDisplay version
-Customies version
+Altay version
 Client version
 Console error/log
 Steps to reproduce

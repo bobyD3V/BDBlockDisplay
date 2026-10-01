@@ -3,12 +3,26 @@ declare(strict_types=1);
 
 namespace BDBlockDisplay\BobyDev;
 
-use customiesdevs\customies\entity\CustomiesEntityFactory;
-use customiesdevs\customies\item\CustomiesItemFactory;
-use customiesdevs\customies\item\ItemComponents;
-use customiesdevs\customies\item\ItemComponentsTrait;
-use customiesdevs\customies\item\component\UseAnimationComponent;
-use customiesdevs\customies\item\component\InteractButtonComponent;
+// Self-contained dependency loader: Customies 1.4.0 is bundled under the
+// BDBlockDisplay\Internal namespace, so no external Customies plugin is required.
+spl_autoload_register(static function(string $class): void{
+    $prefix = "BDBlockDisplay\\Internal\\Customies\\";
+    if(!str_starts_with($class, $prefix)){
+        return;
+    }
+    $relative = substr($class, strlen($prefix));
+    $path = __DIR__ . "/../Internal/Customies/" . str_replace("\\", "/", $relative) . ".php";
+    if(is_file($path)){
+        require_once $path;
+    }
+});
+
+use BDBlockDisplay\Internal\Customies\entity\CustomiesEntityFactory;
+use BDBlockDisplay\Internal\Customies\item\CustomiesItemFactory;
+use BDBlockDisplay\Internal\Customies\item\ItemComponents;
+use BDBlockDisplay\Internal\Customies\item\ItemComponentsTrait;
+use BDBlockDisplay\Internal\Customies\item\component\UseAnimationComponent;
+use BDBlockDisplay\Internal\Customies\item\component\InteractButtonComponent;
 use pocketmine\block\VanillaBlocks;
 use pocketmine\entity\Entity;
 use pocketmine\entity\EntitySizeInfo;
@@ -52,7 +66,7 @@ function bdReadIntTag(CompoundTag $nbt, string $name, int $default): int{
     return is_int($value) ? $value : $default;
 }
 
-const BD_VERSION = '1.0.0';
+const BD_VERSION = '1.0.1';
 
 final class BlockRegistry{
     /** @var array<string,array{0:int,1:int,2:int,3:int,4:int,5:int,6:int}> */
@@ -199,7 +213,22 @@ final class GroupToolItem extends BDITem{public function __construct(ItemIdentif
 
 final class SimpleForm implements \pocketmine\form\Form{
     public function __construct(private string $json,private \Closure $handler){}
-    public function jsonSerialize():mixed{return json_decode($this->json,true);} public function handleResponse(Player $player,mixed $data):void{($this->handler)($player,$data);}
+    private static function normalize(mixed $value):mixed{
+        if(is_string($value)){
+            return str_replace('\\n', "\n", $value);
+        }
+        if(is_array($value)){
+            foreach($value as $key => $item){
+                $value[$key]=self::normalize($item);
+            }
+        }
+        return $value;
+    }
+    public function jsonSerialize():mixed{
+        $decoded=json_decode($this->json,true);
+        return self::normalize($decoded);
+    }
+    public function handleResponse(Player $player,mixed $data):void{($this->handler)($player,$data);}
 }
 
 final class BlockDisplayManager{
@@ -757,14 +786,14 @@ final class main extends PluginBase implements Listener{
     }
     public function itemKindPublic(Item $i):?string{return $this->itemKind($i);}
     protected function onEnable():void{
-        if(!$this->getServer()->getPluginManager()->getPlugin('Customies')){$this->getLogger()->error('Customies 1.4.0 is required.');$this->getServer()->getPluginManager()->disablePlugin($this);return;}
+        // Customies 1.4.0 is embedded under BDBlockDisplay\Internal\Customies.
         $this->manager=new BlockDisplayManager($this);
         ModelRegistryBootstrap::register();
         $this->registerEntities();$this->registerItems();$this->installResourcePack();
         $this->getServer()->getPluginManager()->registerEvents($this,$this);$this->getServer()->getCommandMap()->register('bdbd',new BDBlockCommand($this));
         $this->getScheduler()->scheduleRepeatingTask(new \pocketmine\scheduler\ClosureTask(function(){foreach($this->getServer()->getOnlinePlayers() as $player){$this->manager->refreshClientSolidCollision($player);} }),1);
         $this->getScheduler()->scheduleRepeatingTask(new \pocketmine\scheduler\ClosureTask(function(){foreach($this->getServer()->getWorldManager()->getWorlds() as $w){foreach($w->getEntities() as $e){if($e instanceof DisplayEntity && !$e->isClosed()){$this->manager->syncModel($e);}}}}),40);
-        $this->getLogger()->info('BDBlockDisplay '.BD_VERSION.' enabled. Altay/Customies renderer bridge active (variant/mark_variant/skin_id + virtual walkable collision).');
+        $this->getLogger()->info('BDBlockDisplay '.BD_VERSION.' enabled. Altay renderer active (integrated editor support + native forms + virtual walkable collision).');
     }
     private function registerEntities():void{
         CustomiesEntityFactory::getInstance()->registerEntity(DisplayEntity::class,'bd:display');CustomiesEntityFactory::getInstance()->registerEntity(HandleEntity::class,'bd:handle');
@@ -855,25 +884,25 @@ final class main extends PluginBase implements Listener{
     private function openMenu(Player $p,DisplayEntity $d):void{
         $control=$this->manager->hasPlayerControl($p)&&$this->manager->getPlayerControlDisplay($p)?->getId()===$d->getId();
         $mode=BlockDisplayManager::MODE_NAMES[$d->getMode()]??'Move';
-        $status=$control?'§aPLAYER CONTROL ACTIVE':'§7Player Control: §fOFF';
+        $status=$control?'§aPLAYER CONTROL ACTIVE':'§7PLAYER CONTROL: §fOFF';
         $buttons=[
-            $this->iconButton('§b🧍 PLAYER CONTROL\n§7Walk to move the block','textures/ui/bd/player_control'),
-            $this->iconButton('§e⟳ ROTATION / LEAN\n§75° • 10° • 15° • 30° • 45°','textures/ui/bd/rotate'),
-            $this->iconButton('§d↗ SCALE\n§75% • 10% • 25% • 50%','textures/ui/bd/scale'),
-            $this->iconButton('§a🎯 EXACT VALUES\n§7Position • Rotation • Size','textures/ui/bd/exact'),
-            $this->iconButton('§f⛏ SET BLOCK','textures/ui/bd/setblock'),
-            $this->iconButton('§6↔ QUICK MOVE\n§7X • Y • Z','textures/ui/bd/right'),
-            $this->iconButton('§7◇ VARIANT +','textures/ui/bd/variant'),
-            $this->iconButton('§e⧉ DUPLICATE','textures/ui/bd/duplicate'),
-            $this->iconButton('§b⊞ GROUP','textures/ui/bd/player_control'),
-            $this->iconButton('§b♿ WALKABLE','textures/ui/bd/walkable'),
-            $this->iconButton('§6↻ REFRESH HANDLES','textures/ui/bd/refresh'),
-            $this->iconButton($control?'§c⏹ STOP PLAYER CONTROL':'§7⏹ STOP DRAG','textures/ui/bd/stop'),
-            $this->iconButton('§c✕ DELETE','textures/ui/bd/delete'),
-            $this->iconButton('§f✕ CLOSE','textures/ui/bd/close'),
+            $this->iconButton('§a🧍 PLAYER CONTROL\n§6» §fMove with your player','textures/ui/bd/player_control'),
+            $this->iconButton('§e⟳ ROTATION / LEAN\n§6» §fRotate and bend the display','textures/ui/bd/rotate'),
+            $this->iconButton('§d↗ SCALE\n§6» §fChange display size','textures/ui/bd/scale'),
+            $this->iconButton('§b🎯 EXACT VALUES\n§6» §fPosition • Rotation • Size','textures/ui/bd/exact'),
+            $this->iconButton('§a⛏ SET BLOCK\n§6» §fChoose a block to display','textures/ui/bd/setblock'),
+            $this->iconButton('§6↔ QUICK MOVE\n§6» §fMove X • Y • Z','textures/ui/bd/right'),
+            $this->iconButton('§e◇ VARIANT\n§6» §fChange model variant','textures/ui/bd/variant'),
+            $this->iconButton('§b⊞ GROUP\n§6» §fGroup multiple displays','textures/ui/bd/player_control'),
+            $this->iconButton($d->isSolid()?'§a🚶 WALKABLE: ON\n§6» §fSolid collision enabled':'§7🚶 WALKABLE: OFF\n§6» §fVisual only','textures/ui/bd/walkable'),
+            $this->iconButton('§e⧉ DUPLICATE\n§6» §fCreate a copy','textures/ui/bd/duplicate'),
+            $this->iconButton('§6↻ REFRESH HANDLES\n§6» §fSynchronize editor handles','textures/ui/bd/refresh'),
+            $this->iconButton($control?'§c⏹ STOP CONTROL\n§6» §fRelease player control':'§7⏹ STOP DRAG\n§6» §fStop active editing','textures/ui/bd/stop'),
+            $this->iconButton('§c✕ DELETE\n§6» §fDelete this display','textures/ui/bd/delete'),
+            $this->iconButton('§f✕ CLOSE\n§6» §fClose the editor','textures/ui/bd/close'),
         ];
-        $json=json_encode(['type'=>'form','title'=>'§lBDBLOCKDISPLAY','content'=>'§7Block: §f'.$d->getBlockId()."\n".'§7Size: §f'.round($d->getDisplaySize(),4)."\n".'§7Rotation: §f'.round($d->getLocation()->pitch,3).', '.round($d->getLocation()->yaw,3).', '.round($d->getRoll(),3)."\n".'§7Mode: §f'.$mode."\n".$status."\n§8Player Control is continuous: movement follows your player 1:1.",'buttons'=>$buttons], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
-        $form=new SimpleForm($json,function(Player $p,$data)use($d){
+        $content='§6BLOCKDISPLAY EDITOR\n§d» §fMANAGE THIS DISPLAY\n\n§7BLOCK: §f'.$d->getBlockId().'\n§7SIZE: §f'.round($d->getDisplaySize(),4).'\n§7ROTATION: §f'.round($d->getLocation()->pitch,2).', '.round($d->getLocation()->yaw,2).', '.round($d->getRoll(),2).'\n§7MODE: §f'.$mode.'\n'.$status;
+        $f=new SimpleForm(json_encode(['type'=>'form','title'=>'§l§6BDBLOCKDISPLAY','content'=>$content,'buttons'=>$buttons],JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),function(Player $p,$data)use($d){
             if(!is_int($data))return;
             switch($data){
                 case 0:
@@ -885,10 +914,10 @@ final class main extends PluginBase implements Listener{
                 case 3:$this->exactForm($p,$d);return;
                 case 4:$this->spawnBlockForm($p,$d);return;
                 case 5:$this->openQuickMoveForm($p,$d);return;
-                case 6:$d->setVariant($d->getVariant()+1);$p->sendMessage('§aShape / Variant: '.$d->getVariant());break;
-                case 7:$this->manager->duplicate($p,$d);break;
-                case 8:$this->openGroupMenu($p);return;
-                case 9:$d->setSolid(!$d->isSolid());$p->sendMessage('§eWalkable / Solid: '.($d->isSolid()?'ON':'OFF').' §7(virtual collision)');break;
+                case 6:$d->setVariant($d->getVariant()+1);break;
+                case 7:$this->openGroupMenu($p);return;
+                case 8:$d->setSolid(!$d->isSolid());$this->manager->refreshClientSolidCollision($p);$p->sendMessage('§eWalkable / Solid: '.($d->isSolid()?'ON':'OFF').' §7(virtual collision)');break;
+                case 9:$this->manager->duplicate($p,$d);break;
                 case 10:$this->manager->refreshHandles($p);break;
                 case 11:$this->manager->stopPlayerControl($p,true);$this->manager->stopDrag($p);break;
                 case 12:$this->manager->deleteDisplay($d);$this->manager->clearSelection($p);return;
@@ -897,7 +926,7 @@ final class main extends PluginBase implements Listener{
             }
             $this->manager->syncModel($d);$this->manager->updateHandlePositions($p);$this->openMenu($p,$d);
         });
-        $p->sendForm($form);
+        $p->sendForm($f);
     }
 
     private function openQuickMoveForm(Player $p,DisplayEntity $d):void{
@@ -994,7 +1023,7 @@ final class main extends PluginBase implements Listener{
     private function spawnBlockForm(Player $p,DisplayEntity $d):void{$opts=array_keys(BlockRegistry::BLOCKS);sort($opts);$content=[['type'=>'dropdown','text'=>'Block ID','options'=>$opts,'default'=>array_search($d->getBlockId(),$opts,true)?:0],['type'=>'input','text'=>'Or type block ID','default'=>$d->getBlockId()]];$f=new SimpleForm(json_encode(['type'=>'custom_form','title'=>'Set Block','content'=>$content]),function(Player $p,$data)use($d,$opts){if(!is_array($data))return;$id=trim((string)($data[1]??''));if($id===''&&isset($data[0]))$id=$opts[(int)$data[0]]??'';if($d->setBlockId($id)){$this->manager->syncModel($d);$p->sendMessage('§aBlock set to '.$d->getBlockId());}else$p->sendMessage('§cUnknown block ID.');});$p->sendForm($f);}
     private function exactForm(Player $p,DisplayEntity $d):void{$l=$d->getLocation();$c=[['type'=>'input','text'=>'X','default'=>(string)$l->x],['type'=>'input','text'=>'Y','default'=>(string)$l->y],['type'=>'input','text'=>'Z','default'=>(string)$l->z],['type'=>'input','text'=>'Pitch X','default'=>(string)$l->pitch],['type'=>'input','text'=>'Yaw Y','default'=>(string)$l->yaw],['type'=>'input','text'=>'Roll Z','default'=>(string)$d->getRoll()],['type'=>'input','text'=>'Size','default'=>(string)$d->getDisplaySize()]];$f=new SimpleForm(json_encode(['type'=>'custom_form','title'=>'Exact Values','content'=>$c]),function(Player $p,$data)use($d){if(!is_array($data))return;try{$x=(float)$data[0];$y=(float)$data[1];$z=(float)$data[2];$rx=(float)$data[3];$ry=(float)$data[4];$rz=(float)$data[5];$s=(float)$data[6];$d->teleport(new Location($x,$y,$z,$p->getWorld(),$ry,$rx));$d->setRoll($rz);$d->setDisplaySize($s);$this->manager->syncModel($d);$this->manager->refreshHandles($p);$p->sendMessage('§aExact values updated.');}catch(\Throwable $e){$p->sendMessage('§cInvalid values.');}});$p->sendForm($f);}
     public function command(Player $p,array $args):void{
-        $sub=strtolower($args[0]??'help');switch($sub){case 'wand':$this->giveTools($p);break;case 'tools':$this->giveTools($p);break;case 'menu':$d=$this->manager->selected($p)??$this->manager->findInSight($p,[DisplayEntity::class]);if($d instanceof DisplayEntity)$this->openMenu($p,$d);else$p->sendMessage('§cNo display selected.');break;case 'spawn':$id=$args[1]??'stone';$pos=$p->getPosition()->addVector($p->getDirectionVector()->multiply(3));$d=new DisplayEntity(new Location($pos->x,$pos->y,$pos->z,$p->getWorld(),$p->getLocation()->yaw,$p->getLocation()->pitch),null);if(!$d->setBlockId($id)){$d->flagForDespawn();$p->sendMessage('§cUnknown block.');break;}$d->setMode(1);$d->spawnToAll();$this->manager->syncModel($d);$this->manager->select($p,$d);break;case 'control':$d=$this->manager->selected($p)??$this->manager->findInSight($p,[DisplayEntity::class]);if($d instanceof DisplayEntity){if($this->manager->hasPlayerControl($p))$this->manager->stopPlayerControl($p,true);else $this->manager->startPlayerControl($p,$d);}else$p->sendMessage('§cNo display selected.');break;case 'group':$this->openGroupMenu($p);break;case 'grouptool':$this->openGroupMenu($p);break;case 'mode':$m=strtolower($args[1]??'');$map=['off'=>0,'move'=>1,'rotate'=>2,'scale'=>3,'calibrate'=>4];$d=$this->manager->selected($p);if($d instanceof DisplayEntity&&isset($map[$m])){$this->manager->stopDrag($p);$this->manager->setMode($d,$map[$m]);$this->manager->refreshHandles($p);}else$p->sendMessage('§7Usage: /bdbd mode <off|move|rotate|scale|calibrate>');break;case 'drag':$action=strtolower($args[1]??'');if($action==='stop'){$this->manager->stopDrag($p);$p->sendMessage('§7Drag stopped.');}else{$p->sendMessage('§7Usage: /bdbd drag stop');}break;case 'solid':$d=$this->manager->selected($p);if($d instanceof DisplayEntity){$v=strtolower($args[1]??'toggle');$d->setSolid($v==='on'?true:($v==='off'?false:!$d->isSolid()));$this->manager->refreshClientSolidCollision($p);$p->sendMessage('§eWalkable / Solid: '.($d->isSolid()?'ON':'OFF').' §7(client-native collision, no world blocks)');}break;case 'delete':$d=$this->manager->selected($p);if($d instanceof DisplayEntity){$this->manager->deleteDisplay($d);$this->manager->clearSelection($p);}$p->sendMessage('§aDeleted selected display.');break;case 'cleanup':$this->manager->clearAllHandles();$n=0;foreach($this->getServer()->getWorldManager()->getWorlds() as $w)foreach($w->getEntities() as $e)if($e instanceof ModelFaceEntity && $e->isClosed()===false && $this->manager->findOwnerDisplay($e)===null){$e->flagForDespawn();$n++;}$p->sendMessage('§aCleanup complete: '.$n.' model entities.');break;case 'list':$list=$this->manager->listDisplays($p);$p->sendMessage('§eDisplays in world: '.count($list));foreach(array_slice($list,0,20) as $d)$p->sendMessage('§7#'.$d->getId().' '.$d->getBlockId().' size='.$d->getDisplaySize());break;case 'version':$p->sendMessage('§aBDBlockDisplay '.BD_VERSION.'');break;case 'debug':$p->sendMessage('§7Selected='.($this->manager->selected($p)?->getId()??'none').' Control='.($this->manager->hasPlayerControl($p)?'ON':'OFF').' Drag='.($this->manager->hasActiveDrag($p)?'ON':'OFF'));break;default:$p->sendMessage('§eBDBlockDisplay: /bdbd wand | spawn <block> | menu | control | group | grouptool | mode <move|rotate|scale|calibrate> | drag stop | solid [on|off|toggle] | delete | cleanup | list | version | debug');}}
+        $sub=strtolower($args[0]??'help');switch($sub){case 'wand':$this->giveTools($p);break;case 'tools':$this->giveTools($p);break;case 'menu':$d=$this->manager->selected($p)??$this->manager->findInSight($p,[DisplayEntity::class]);if($d instanceof DisplayEntity)$this->openMenu($p,$d);else$p->sendMessage('§cNo display selected.');break;case 'spawn':$id=$args[1]??'stone';$pos=$p->getPosition()->addVector($p->getDirectionVector()->multiply(3));$d=new DisplayEntity(new Location($pos->x,$pos->y,$pos->z,$p->getWorld(),$p->getLocation()->yaw,$p->getLocation()->pitch),null);if(!$d->setBlockId($id)){$d->flagForDespawn();$p->sendMessage('§cUnknown block.');break;}$d->setMode(1);$d->spawnToAll();$this->manager->syncModel($d);$this->manager->select($p,$d);break;case 'control':$d=$this->manager->selected($p)??$this->manager->findInSight($p,[DisplayEntity::class]);if($d instanceof DisplayEntity){if($this->manager->hasPlayerControl($p))$this->manager->stopPlayerControl($p,true);else $this->manager->startPlayerControl($p,$d);}else$p->sendMessage('§cNo display selected.');break;case 'group':$this->openGroupMenu($p);break;case 'grouptool':$this->openGroupMenu($p);break;case 'mode':$m=strtolower($args[1]??'');$map=['off'=>0,'move'=>1,'rotate'=>2,'scale'=>3,'calibrate'=>4];$d=$this->manager->selected($p);if($d instanceof DisplayEntity&&isset($map[$m])){$this->manager->stopDrag($p);$this->manager->setMode($d,$map[$m]);$this->manager->refreshHandles($p);}else$p->sendMessage('§7Usage: /bdbd mode <off|move|rotate|scale|calibrate>');break;case 'drag':$action=strtolower($args[1]??'');if($action==='stop'){$this->manager->stopDrag($p);$p->sendMessage('§7Drag stopped.');}else{$p->sendMessage('§7Usage: /bdbd drag stop');}break;case 'solid':$d=$this->manager->selected($p);if($d instanceof DisplayEntity){$v=strtolower($args[1]??'toggle');$d->setSolid($v==='on'?true:($v==='off'?false:!$d->isSolid()));$this->manager->refreshClientSolidCollision($p);$p->sendMessage('§eWalkable / Solid: '.($d->isSolid()?'ON':'OFF').' §7(client-native collision, no world blocks)');}break;case 'delete':$d=$this->manager->selected($p);if($d instanceof DisplayEntity){$this->manager->deleteDisplay($d);$this->manager->clearSelection($p);}$p->sendMessage('§aDeleted selected display.');break;case 'cleanup':$this->manager->clearAllHandles();$n=0;foreach($this->getServer()->getWorldManager()->getWorlds() as $w)foreach($w->getEntities() as $e)if($e instanceof ModelFaceEntity && $e->isClosed()===false && $this->manager->findOwnerDisplay($e)===null){$e->flagForDespawn();$n++;}$p->sendMessage('§aCleanup complete: '.$n.' model entities.');break;case 'list':$list=$this->manager->listDisplays($p);$p->sendMessage('§eDisplays in world: '.count($list));foreach(array_slice($list,0,20) as $d)$p->sendMessage('§7#'.$d->getId().' '.$d->getBlockId().' size='.$d->getDisplaySize());break;case 'version':$p->sendMessage('§aBDBlockDisplay '.BD_VERSION.' — clean public release');break;case 'debug':$p->sendMessage('§7Selected='.($this->manager->selected($p)?->getId()??'none').' Control='.($this->manager->hasPlayerControl($p)?'ON':'OFF').' Drag='.($this->manager->hasActiveDrag($p)?'ON':'OFF'));break;default:$p->sendMessage('§eBDBlockDisplay: /bdbd wand | spawn <block> | menu | control | group | grouptool | mode <move|rotate|scale|calibrate> | drag stop | solid [on|off|toggle] | delete | cleanup | list | version | debug');}}
 }
 
 
