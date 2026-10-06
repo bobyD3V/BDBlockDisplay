@@ -1,0 +1,11 @@
+{
+  "name": "bobydev/bdblockdisplay",
+  "description": "BDBlockDisplay editor for Altay",
+  "type": "project",
+  "require-dev": {
+    "phpstan/phpstan": "^2.2"
+  },
+  "scripts": {
+    "phpstan": "phpstan analyse -c phpstan.neon --memory-limit=1G"
+  }
+}

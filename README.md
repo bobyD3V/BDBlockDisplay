@@ -2,7 +2,7 @@
 <img width="1891" height="832" alt="1000073148" src="https://github.com/user-attachments/assets/18f06f1e-7616-488d-8f37-8ea9b89c53eb" />
 # 🧊 BDBlockDisplay
 
-**Version:** 1.0.1
+**Version:** 1.0.3
 **Author:** BobyDev
 
 > ✨ **A powerful in-world block display editor for Minecraft Bedrock servers running Altay.**
@@ -10,6 +10,8 @@
 BDBlockDisplay lets server administrators create **displayable 3D blocks**, then move, rotate, scale, group, and precisely position them directly inside the world.
 
 Built for **Altay** with bundled Customies editor support, a resource pack, and mobile-friendly controls.
+
+The 1.0.3 release refactors the implementation into dedicated entity, display, UI, command, listener, service, model, and core classes while preserving the editor workflow. Composer and PHPStan configuration are included for development review.
 
 ---
 
@@ -59,7 +61,7 @@ BDBlockDisplay is self-contained and does not require a separate Customies plugi
 Put:
 
 ```text
-BDBlockDisplay-1.0.1.phar
+BDBlockDisplay-1.0.3.phar
 ```
 
 inside:
@@ -539,7 +541,7 @@ BDBlockDisplay/
 ╔══════════════════════════════════╗
 ║        🧊 BDBlockDisplay         ║
 ╠══════════════════════════════════╣
-║ Version : 1.0.1                  ║
+║ Version : 1.0.3                  ║
 ║ Author  : BobyDev                ║
 ║ Main    : BDBlockDisplay\        ║
 ║           BobyDev\main           ║
